@@ -1,38 +1,39 @@
-import pyicap
-from pyicap import BaseICAPRequestHandler, ICAPServer
+# Created by Max van der Wolf
+import socketserver
 
-class URLBlockerHandler(BaseICAPRequestHandler):
-    def options(self):
-        self.set_icap_response(200)
-        self.set_icap_header('Methods', 'REQMOD')
+from pyicap import *
 
-    def reqmod(self):
-        # Get the original HTTP request
-        http_request = self.get_enc_req()
+class ThreadingSimpleServer(socketserver.ThreadingMixIn, ICAPServer):
+    pass
 
-        # Extract the URL from the request
-        url = http_request.headers.get('Host', '') + http_request.uri
-
-        # List of blocked domains
-        blocked_domains = ["example.com"]
-
-        print("request: ", url)
+class ICAPHandler(BaseICAPRequestHandler):
 
 
-        # Check if the requested URL is in the blocked domains list
-        if any(domain in url for domain in blocked_domains):
-            # If the URL is blocked, respond with HTTP 403 Forbidden
-            self.set_icap_response(403)
-            self.send_headers()
-            self.send_response(b'Access to this URL is blocked')
-        else:
-            # If the URL is not blocked, pass the request through
-            self.no_adaptation_required()
+    def serv_OPTIONS(self):
+        self.set_icap_response(403)
+        #self.set_icap_header("Methods", "RESPMOD")
+        self.set_icap_header("Methods", "REQMOD")
+        self.set_icap_header("Preview", "0")
+        self.set_icap_header("Service", "Inky Experimental")
+        self.send_headers(False)
 
-if __name__ == "__main__":
-    server = ICAPServer(('127.0.0.1', 1344), URLBlockerHandler)
-    try:
-        print("ICAP server started on icap://127.0.0.1:1344")
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("ICAP server stopped.")
+    # TODO: Fix issue REQMOD getting "Connection reset by peer" error
+    def serv_REQMOD(self):
+        self.set_icap_response(403)
+        print("test")
+
+    def serv_RESPMOD(self):
+        print("test")
+        self.set_icap_response(403)
+        self.no_adaptation_required()
+        
+
+port = 1344
+
+server = ThreadingSimpleServer(("", port), ICAPHandler)
+try:
+    while 1:
+        server.handle_request()
+        print("server killed")
+except KeyboardInterrupt:
+    print("Exited")
